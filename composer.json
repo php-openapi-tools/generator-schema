@@ -1,0 +1,56 @@
+{
+    "name": "openapi-tools/generator-schema",
+    "description": "Schema (+ contract + error) generator",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Cees-Jan Kiewiet",
+            "email": "ceesjank@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "ext-json": "^8.2",
+        "eventsauce/object-hydrator": "^1.5",
+        "nikic/php-parser": "^4.19",
+        "openapi-tools/contract": "dev-main",
+        "openapi-tools/representation": "dev-main",
+        "openapi-tools/utils": "dev-main"
+    },
+    "require-dev": {
+        "openapi-tools/gatherer": "dev-main",
+        "openapi-tools/test-data": "dev-main",
+        "wyrihaximus/test-utilities": "^6.0.10"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "OpenAPITools\\Generator\\Schema\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "OpenAPITools\\Tests\\Generator\\Schema\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "ergebnis/composer-normalize": true,
+            "infection/extension-installer": true,
+            "wyrihaximus/composer-update-bin-autoload-path": true
+        },
+        "platform": {
+            "php": "8.2.13"
+        }
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "composer normalize"
+        ],
+        "post-update-cmd": [
+            "composer normalize"
+        ]
+    }
+}

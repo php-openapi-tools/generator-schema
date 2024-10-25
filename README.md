@@ -1,2 +1,2 @@
-# generator-schema
-Schema file generator
+# utils
+Utils for OpenAPI Tools
