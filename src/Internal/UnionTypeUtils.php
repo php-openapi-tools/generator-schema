@@ -26,7 +26,7 @@ final class UnionTypeUtils
                     'string' => $typeInUnion->payload,
                     'array' => 'array',
                     'object' => match ($typeInUnion->payload::class) {
-                        Representation\Namespaced\Schema::class => $typeInUnion->payload->className->relative,
+                        Representation\Namespaced\Schema::class => $typeInUnion->payload->className->fullyQualified->source,
                         Representation\Namespaced\Property\Type::class => self::buildUnionType($typeInUnion->payload),
                     },
                 };

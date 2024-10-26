@@ -150,7 +150,7 @@ final class SingleCastUnionToType
                                                             'hydrateObject',
                                                             [
                                                                 $builderFactory->classConstFetch(
-                                                                    $classString->relative,
+                                                                    $classString->fullyQualified->source,
                                                                     'class',
                                                                 ),
                                                                 $builderFactory->var('value'),
