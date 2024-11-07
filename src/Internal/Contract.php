@@ -127,6 +127,6 @@ final readonly class Contract implements FileGenerator
             $interface->setDocComment('/**' . PHP_EOL . ' * ' . implode(PHP_EOL . ' * ', $contractProperties) . PHP_EOL . ' */');
         }
 
-        yield new File($pathPrefix, $contract->className->relative, $this->builderFactory->namespace($contract->className->namespace->source)->addStmt($interface)->getNode());
+        yield new File($pathPrefix, $contract->className->relative, $this->builderFactory->namespace($contract->className->namespace->source)->addStmt($interface)->getNode(), File::DO_LOAD_ON_WRITE);
     }
 }
