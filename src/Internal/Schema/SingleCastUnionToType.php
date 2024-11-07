@@ -176,6 +176,6 @@ final class SingleCastUnionToType
             ]),
         );
 
-        yield new File($pathPrefix, $classString->relative, $stmt->addStmt($class)->getNode());
+        yield new File($pathPrefix, $classString->relative, $stmt->addStmt($class)->getNode(), File::DO_LOAD_ON_WRITE);
     }
 }

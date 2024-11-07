@@ -236,13 +236,13 @@ final readonly class Schema implements FileGenerator
 
         $class->addStmt($constructor);
 
-        yield new File($pathPrefix, $className->relative, $this->builderFactory->namespace($className->namespace->source)->addStmt($class)->getNode());
+        yield new File($pathPrefix, $className->relative, $this->builderFactory->namespace($className->namespace->source)->addStmt($class)->getNode(), File::DO_LOAD_ON_WRITE);
 
         foreach ($aliases as $alias) {
             $aliasTms   = $this->builderFactory->namespace($alias->namespace->source);
             $aliasClass = $this->builderFactory->class($alias->className)->makeFinal()->makeReadonly()->extend($className->fullyQualified->source);
 
-            yield new File($pathPrefix, $alias->relative, $aliasTms->addStmt($aliasClass)->getNode());
+            yield new File($pathPrefix, $alias->relative, $aliasTms->addStmt($aliasClass)->getNode(), File::DO_LOAD_ON_WRITE);
         }
     }
 }
