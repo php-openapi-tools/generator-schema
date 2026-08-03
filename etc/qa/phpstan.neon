@@ -1,8 +1,15 @@
 parameters:
+	level: max
+	paths:
+		- ../../etc
+		- ../../src
+		- ../../tests
 	ignoreErrors:
 		- '#Access to an undefined property OpenAPITools\\Contract\\Package::#'
-		- '#thecodingmachine\/safe#'
-		- '#Parameter \#2 \$haystack of static method PHPUnit\\Framework\\Assert::assertStringContainsString\(\) expects string, PhpParser\\Node\|string given.#'
-		- '#extends PHPUnit\\Framework\\TestCase, is concrete, but does not have a Test suffix.#'
-includes:
-	- ../../vendor/wyrihaximus/test-utilities/rules.neon
+		- '#Cannot access property \$source on mixed\.#'
+		- '#Parameter \#1 \$pathPrefix of method OpenAPITools\\Generator\\Schema\\Internal\\.* expects string, mixed given\.#'
+		- '#Parameter \#2 \$namespace of method OpenAPITools\\Generator\\Schema\\Internal\\.* expects OpenAPITools\\Utils\\Namespace_, mixed given\.#'
+		- '#Parameter \#2 \$haystack of static method PHPUnit\\Framework\\Assert::assertStringContainsString\(\) expects string, PhpParser\\Node\|string given\.#'
+		- '#Class OpenAPITools\\Tests\\Generator\\Schema\\DataTests\\.* extends PHPUnit\\Framework\\TestCase, is concrete, but does not have a Test suffix\.#'
+		- '#Unused OpenAPITools\\Tests\\Generator\\Schema\\DataTests\\.*::assert#'
+		- '#Unused OpenAPITools\\Generator\\Schema\\Schema::__construct#'

@@ -12,7 +12,6 @@ use function gettype;
 use function implode;
 use function is_array;
 use function is_string;
-use function strlen;
 use function trim;
 
 final class UnionTypeUtils
@@ -41,9 +40,9 @@ final class UnionTypeUtils
                 array_filter(
                     array_filter(
                         $typeList,
-                        static fn ($item): bool => is_string($item),
+                        is_string(...),
                     ),
-                    static fn (string $item): bool => strlen(trim($item)) > 0,
+                    static fn (string $item): bool => trim($item) !== '',
                 ),
             ),
         );

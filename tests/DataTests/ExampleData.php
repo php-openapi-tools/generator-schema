@@ -14,7 +14,7 @@ use const JSON_PRETTY_PRINT;
 
 final class ExampleData extends TestCase
 {
-    private const EXAMPLE_DATA = [
+    private const array EXAMPLE_DATA = [
         null,
         'generated',
         'generated',
@@ -51,7 +51,10 @@ final class ExampleData extends TestCase
         foreach (self::EXAMPLE_DATA as $data) {
             $json = json_encode($data, JSON_PRETTY_PRINT);
             self::assertIsString($json);
-            self::assertStringContainsString(str_replace([' ', '\\'], ['', '\\\\'], $json), str_replace(' ', '', $files['Schema\Basic']->contents));
+            self::assertStringContainsString(
+                str_replace([' ', '\\'], ['', '\\\\'], $json),
+                str_replace([' ', '\\'], ['', '\\\\'], $files['Schema\Basic']->contents),
+            );
         }
     }
 }

@@ -28,7 +28,6 @@ use function json_encode;
 use function md5;
 use function str_replace;
 use function str_split;
-use function strlen;
 use function strtoupper;
 
 use const JSON_PRETTY_PRINT;
@@ -111,7 +110,7 @@ final readonly class Schema implements FileGenerator
         $constructor       = $this->builderFactory->method('__construct')->makePublic();
         $constructDocBlock = [];
         foreach ($schema->properties as $property) {
-            if (strlen($property->description) > 0) {
+            if ($property->description !== '') {
                 $constructDocBlock[] = $property->name . ': ' . $property->description;
             }
 
@@ -142,14 +141,19 @@ final readonly class Schema implements FileGenerator
             if ($property->type->type === 'array' && ! is_string($property->type->payload)) {
                 if ($property->type->payload instanceof Representation\Namespaced\Property\Type) {
                     if (! $property->type->payload->payload instanceof Representation\Namespaced\Property\Type) {
-                        $iterableType = $property->type->payload;
-                        if ($iterableType->payload instanceof Representation\Namespaced\Schema) {
-                            $iterableType = $iterableType->payload->className->fullyQualified->source;
+                        $iterableTypeNode     = $property->type->payload;
+                        $compiledIterableType = null;
+
+                        if ($iterableTypeNode->payload instanceof Representation\Namespaced\Schema) {
+                            $compiledIterableType = $iterableTypeNode->payload->className->fullyQualified->source;
                         }
 
-                        if ($iterableType instanceof Representation\Namespaced\Property\Type && (($iterableType->payload instanceof Representation\Namespaced\Property\Type && $iterableType->payload->type === 'union') || is_array($iterableType->payload))) {
-                            $schemaClasses = [...UnionTypeUtils::getUnionTypeSchemas($iterableType)];
-                            $iterableType  = UnionTypeUtils::buildUnionType($iterableType);
+                        $remainingIterableType = $compiledIterableType === null ? $iterableTypeNode : null;
+
+                        if ($remainingIterableType instanceof Representation\Namespaced\Property\Type && (($remainingIterableType->payload instanceof Representation\Namespaced\Property\Type && $remainingIterableType->payload->type === 'union') || is_array($remainingIterableType->payload))) {
+                            $schemaClasses         = [...UnionTypeUtils::getUnionTypeSchemas($remainingIterableType)];
+                            $compiledIterableType  = UnionTypeUtils::buildUnionType($remainingIterableType);
+                            $remainingIterableType = null;
 
                             if (count($schemaClasses) > 0) {
                                 $castToUnionToType = ClassString::factory($className->baseNamespace, Utils::className('Internal\\Attribute\\CastUnionToType\\Single\\' . $className->relative . '\\' . $property->name));
@@ -160,15 +164,18 @@ final readonly class Schema implements FileGenerator
                             }
                         }
 
-                        if ($iterableType instanceof Representation\Namespaced\Property\Type) {
-                            $iterableType = $iterableType->payload;
+                        if ($remainingIterableType instanceof Representation\Namespaced\Property\Type) {
+                            $payload = $remainingIterableType->payload;
+                            if (is_string($payload)) {
+                                $compiledIterableType = $payload;
+                            }
                         }
 
-                        if (! is_string($iterableType)) {
-                            throw new RuntimeException('At this point $iterableType should be a string');
+                        if (! is_string($compiledIterableType)) {
+                            throw new RuntimeException('At this point $compiledIterableType should be a string');
                         }
 
-                        $compiledTYpe        = ($property->nullable ? '?' : '') . 'array<' . $iterableType . '>';
+                        $compiledTYpe        = ($property->nullable ? '?' : '') . 'array<' . $compiledIterableType . '>';
                         $constructDocBlock[] = '@param ' . $compiledTYpe . ' $' . $property->name;
                     }
 
