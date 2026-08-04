@@ -32,7 +32,7 @@ final class SchemaTest extends TestCase
     #[DataProviderExternal(Provider::class, 'sets')]
     public function gather(DataSet $dataSet): void
     {
-        $representation = self::loadSpec($dataSet->fileName);
+        $representation = $this->loadSpec($dataSet->fileName);
 
         $testClassName = '\OpenAPITools\Tests\Generator\Schema\DataTests\\' . $dataSet->name;
         self::assertTrue(class_exists($testClassName));
@@ -80,13 +80,13 @@ final class SchemaTest extends TestCase
         );
 
         $files          = [];
-        $generatedFiles = (new Schema(new BuilderFactory()))->generate($package, $representation->namespace($package->namespace));
+        $generatedFiles = new Schema(new BuilderFactory())->generate($package, $representation->namespace($package->namespace));
 
         foreach ($generatedFiles as $generatedFile) {
             $files[$generatedFile->fqcn] = new File(
                 $generatedFile->pathPrefix,
                 $generatedFile->fqcn,
-                is_string($generatedFile->contents) ? $generatedFile->contents : (new Standard())->prettyPrint([
+                is_string($generatedFile->contents) ? $generatedFile->contents : new Standard()->prettyPrint([
                     new Node\Stmt\Declare_([
                         new Node\Stmt\DeclareDeclare('strict_types', new Node\Scalar\LNumber(1)),
                     ]),
@@ -100,7 +100,7 @@ final class SchemaTest extends TestCase
         call_user_func($testClassName . '::assert', ...$files); // phpcs:disable
     }
 
-    private static function loadSpec(string $dataSetName): Representation
+    private function loadSpec(string $dataSetName): Representation
     {
         return Gatherer::gather(
             Reader::readFromYamlFile($dataSetName),

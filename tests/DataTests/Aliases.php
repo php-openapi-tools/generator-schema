@@ -11,6 +11,6 @@ final class Aliases extends TestCase
 {
     public static function assert(File ...$files): void
     {
-        self::assertCount(19, $files);
+        self::assertCount(16, $files);
     }
 }

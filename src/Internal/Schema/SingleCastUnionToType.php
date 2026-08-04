@@ -18,6 +18,7 @@ use Throwable;
 use function array_shift;
 use function count;
 use function implode;
+use function is_scalar;
 use function sort;
 
 final class SingleCastUnionToType
@@ -112,12 +113,16 @@ final class SingleCastUnionToType
                                     foreach ($schema->properties as $property) {
                                         $enumConditionals = [];
                                         foreach ($property->enum as $enumPossibility) {
+                                            if (! is_scalar($enumPossibility) && $enumPossibility !== null) {
+                                                continue;
+                                            }
+
                                             $enumConditionals[] = new Node\Expr\BinaryOp\Identical(
                                                 new Node\Expr\ArrayDimFetch(
                                                     $builderFactory->var('value'),
                                                     new Node\Scalar\String_($property->sourceName),
                                                 ),
-                                                $builderFactory->val($enumPossibility), /** @phpstan-ignore-line */
+                                                $builderFactory->val($enumPossibility),
                                             );
                                         }
 

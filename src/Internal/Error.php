@@ -9,7 +9,7 @@ use OpenAPITools\Representation;
 use OpenAPITools\Utils\File;
 use PhpParser\BuilderFactory;
 
-final class Error
+final readonly class Error
 {
     public function __construct(private BuilderFactory $builderFactory)
     {
@@ -30,7 +30,7 @@ final class Error
 
         $class = $this->builderFactory->class($schema->errorClassName->className)->extend('\\' . \Error::class)->makeFinal();
 
-        $class->addStmt((new BuilderFactory())->method('__construct')->makePublic()->addParam(
+        $class->addStmt(new BuilderFactory()->method('__construct')->makePublic()->addParam(
             $this->builderFactory->param('status')->setType('int')->makePublic(),
         )->addParam(
             $this->builderFactory->param('error')->setType($schema->className->fullyQualified->source)->makePublic(),

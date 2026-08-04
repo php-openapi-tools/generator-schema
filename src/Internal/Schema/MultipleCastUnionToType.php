@@ -61,11 +61,13 @@ final class MultipleCastUnionToType
                         $builderFactory->var('value'),
                     ),
                 ),
-                $builderFactory->funcCall(
-                    'unset',
-                    [
-                        $builderFactory->var('value'),
-                    ],
+                new Node\Stmt\Expression(
+                    $builderFactory->funcCall(
+                        'unset',
+                        [
+                            $builderFactory->var('value'),
+                        ],
+                    ),
                 ),
                 new Node\Stmt\Foreach_(
                     $builderFactory->var('values'),
