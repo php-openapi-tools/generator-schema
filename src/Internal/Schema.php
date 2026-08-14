@@ -10,6 +10,10 @@ use OpenAPITools\Contract\FileGenerator;
 use OpenAPITools\Contract\Package;
 use OpenAPITools\Generator\Schema\Internal\Schema\MultipleCastUnionToType;
 use OpenAPITools\Generator\Schema\Internal\Schema\SingleCastUnionToType;
+use OpenAPITools\Generator\Utils\Builder\DocBlockBuilder;
+use OpenAPITools\Generator\Utils\Type\DocBlockTag;
+use OpenAPITools\Generator\Utils\Type\PropertyTypeResolver;
+use OpenAPITools\Generator\Utils\Type\UnionTypeUtils;
 use OpenAPITools\Representation;
 use OpenAPITools\Utils\ClassString;
 use OpenAPITools\Utils\File;
@@ -18,20 +22,16 @@ use OpenAPITools\Utils\Utils;
 use PhpParser\BuilderFactory;
 use RuntimeException;
 
-use function array_unique;
 use function count;
-use function explode;
 use function implode;
 use function is_array;
 use function is_string;
 use function json_encode;
 use function md5;
-use function str_replace;
 use function str_split;
 use function strtoupper;
 
 use const JSON_PRETTY_PRINT;
-use const PHP_EOL;
 
 final readonly class Schema implements FileGenerator
 {
@@ -124,9 +124,7 @@ final readonly class Schema implements FileGenerator
                 ));
             }
 
-            $types = [];
             if ($property->type->type === 'union' && is_array($property->type->payload)) {
-                $types[]       = UnionTypeUtils::buildUnionType($property->type);
                 $schemaClasses = [...UnionTypeUtils::getUnionTypeSchemas($property->type)];
 
                 if (count($schemaClasses) > 0) {
@@ -141,19 +139,11 @@ final readonly class Schema implements FileGenerator
             if ($property->type->type === 'array' && ! is_string($property->type->payload)) {
                 if ($property->type->payload instanceof Representation\Namespaced\Property\Type) {
                     if (! $property->type->payload->payload instanceof Representation\Namespaced\Property\Type) {
-                        $iterableTypeNode     = $property->type->payload;
-                        $compiledIterableType = null;
-
-                        if ($iterableTypeNode->payload instanceof Representation\Namespaced\Schema) {
-                            $compiledIterableType = $iterableTypeNode->payload->className->fullyQualified->source;
-                        }
-
-                        $remainingIterableType = $compiledIterableType === null ? $iterableTypeNode : null;
+                        $iterableTypeNode      = $property->type->payload;
+                        $remainingIterableType = $iterableTypeNode->payload instanceof Representation\Namespaced\Schema ? null : $iterableTypeNode;
 
                         if ($remainingIterableType instanceof Representation\Namespaced\Property\Type && (($remainingIterableType->payload instanceof Representation\Namespaced\Property\Type && $remainingIterableType->payload->type === 'union') || is_array($remainingIterableType->payload))) {
-                            $schemaClasses         = [...UnionTypeUtils::getUnionTypeSchemas($remainingIterableType)];
-                            $compiledIterableType  = UnionTypeUtils::buildUnionType($remainingIterableType);
-                            $remainingIterableType = null;
+                            $schemaClasses = [...UnionTypeUtils::getUnionTypeSchemas($remainingIterableType)];
 
                             if (count($schemaClasses) > 0) {
                                 $castToUnionToType = ClassString::factory($className->baseNamespace, Utils::className('Internal\\Attribute\\CastUnionToType\\Single\\' . $className->relative . '\\' . $property->name));
@@ -163,20 +153,6 @@ final readonly class Schema implements FileGenerator
                                 $constructorParam->addAttribute($this->builderFactory->attribute($castToUnionToType->fullyQualified->source));
                             }
                         }
-
-                        if ($remainingIterableType instanceof Representation\Namespaced\Property\Type) {
-                            $payload = $remainingIterableType->payload;
-                            if (is_string($payload)) {
-                                $compiledIterableType = $payload;
-                            }
-                        }
-
-                        if (! is_string($compiledIterableType)) {
-                            throw new RuntimeException('At this point $compiledIterableType should be a string');
-                        }
-
-                        $compiledTYpe        = ($property->nullable ? '?' : '') . 'array<' . $compiledIterableType . '>';
-                        $constructDocBlock[] = '@param ' . $compiledTYpe . ' $' . $property->name;
                     }
 
                     if ($property->type->payload->payload instanceof Representation\Namespaced\Schema) {
@@ -204,41 +180,24 @@ final readonly class Schema implements FileGenerator
                         yield from MultipleCastUnionToType::generate($this->builderFactory, $pathPrefix, $arrayCastToUnionToType, $castToUnionToType, ...$schemaClasses);
 
                         $constructorParam->addAttribute($this->builderFactory->attribute($arrayCastToUnionToType->fullyQualified->source));
-
-                        $compiledTYpe        = ($property->nullable ? '?' : '') . 'array<' . implode('|', array_unique([
-                            ...(static function (Representation\Namespaced\Schema ...$schemas): iterable {
-                                foreach ($schemas as $schema) {
-                                    yield $schema->className->fullyQualified->source;
-                                }
-                            })(...$schemaClasses),
-                        ])) . '>';
-                        $constructDocBlock[] = '@param ' . $compiledTYpe . ' $' . $property->name;
                     }
                 }
-
-                $types[] = 'array';
-            } elseif ($property->type->payload instanceof Representation\Namespaced\Schema) {
-                $types[] = $property->type->payload->className->fullyQualified->source;
-            } elseif (is_string($property->type->payload)) {
-                $types[] = $property->type->payload;
             }
 
-            $types = array_unique($types);
-
-            $nullable = '';
-            if ($property->nullable) {
-                $nullable = count($types) > 1 || count(explode('|', implode('|', $types))) > 1 ? 'null|' : '?';
+            $resolved = PropertyTypeResolver::resolve($property, DocBlockTag::Param);
+            if ($resolved->docBlockLine !== '') {
+                $constructDocBlock[] = $resolved->docBlockLine;
             }
 
-            if (count($types) > 0) {
-                $constructorParam->setType($nullable . implode('|', $types));
+            if ($resolved->typeHint() !== '') {
+                $constructorParam->setType($resolved->typeHint());
             }
 
             $constructor->addParam($constructorParam);
         }
 
         if (count($constructDocBlock) > 0) {
-            $constructor->setDocComment('/**' . PHP_EOL . ' * ' . implode(PHP_EOL . ' * ', str_replace(['/**', '*/'], '', $constructDocBlock)) . PHP_EOL . ' */');
+            $constructor->setDocComment(DocBlockBuilder::fromDocLines($constructDocBlock));
         }
 
         $class->addStmt($constructor);

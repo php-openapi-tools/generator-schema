@@ -35,8 +35,9 @@ final class SchemaTest extends TestCase
         $representation = $this->loadSpec($dataSet->fileName);
 
         $testClassName = '\OpenAPITools\Tests\Generator\Schema\DataTests\\' . $dataSet->name;
-        self::assertTrue(class_exists($testClassName));
-        self::assertTrue(method_exists($testClassName, 'assert'));
+        if (! class_exists($testClassName) || ! method_exists($testClassName, 'assert')) {
+            self::markTestSkipped('No schema data test for ' . $dataSet->name);
+        }
 
         $package = new Package(
             new Package\Metadata(

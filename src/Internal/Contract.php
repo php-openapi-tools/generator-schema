@@ -6,21 +6,17 @@ namespace OpenAPITools\Generator\Schema\Internal;
 
 use OpenAPITools\Contract\FileGenerator;
 use OpenAPITools\Contract\Package;
+use OpenAPITools\Generator\Utils\Builder\DocBlockBuilder;
+use OpenAPITools\Generator\Utils\Type\DocBlockTag;
+use OpenAPITools\Generator\Utils\Type\PropertyTypeResolver;
 use OpenAPITools\Representation;
 use OpenAPITools\Utils\File;
 use OpenAPITools\Utils\Namespace_;
 use PhpParser\BuilderFactory;
-use RuntimeException;
 
 use function array_key_exists;
-use function array_unique;
+use function array_values;
 use function count;
-use function explode;
-use function implode;
-use function is_array;
-use function is_string;
-
-use const PHP_EOL;
 
 final readonly class Contract implements FileGenerator
 {
@@ -52,87 +48,16 @@ final readonly class Contract implements FileGenerator
         $interface          = $this->builderFactory->interface($contract->className->className);
         $contractProperties = [];
         foreach ($contract->properties as $property) {
-            $types = [];
-            if ($property->type->type === 'union' && is_array($property->type->payload)) {
-                $types[] = UnionTypeUtils::buildUnionType($property->type);
+            $resolved = PropertyTypeResolver::resolve($property, DocBlockTag::Property);
+            if ($resolved->docBlockLine === '' || array_key_exists($property->name, $contractProperties)) {
+                continue;
             }
 
-            if ($property->type->type === 'array' && ! is_string($property->type->payload)) {
-                if ($property->type->payload instanceof Representation\Namespaced\Property\Type) {
-                    if (! $property->type->payload->payload instanceof Representation\Namespaced\Property\Type) {
-                        $iterableTypeNode     = $property->type->payload;
-                        $compiledIterableType = null;
-
-                        if ($iterableTypeNode->payload instanceof Representation\Namespaced\Schema) {
-                            $compiledIterableType = $iterableTypeNode->payload->className->fullyQualified->source;
-                        }
-
-                        $remainingIterableType = $compiledIterableType === null ? $iterableTypeNode : null;
-
-                        if ($remainingIterableType instanceof Representation\Namespaced\Property\Type && (($remainingIterableType->payload instanceof Representation\Namespaced\Property\Type && $remainingIterableType->payload->type === 'union') || is_array($remainingIterableType->payload))) {
-                            $compiledIterableType  = UnionTypeUtils::buildUnionType($remainingIterableType);
-                            $remainingIterableType = null;
-                        }
-
-                        if ($remainingIterableType instanceof Representation\Namespaced\Property\Type) {
-                            $payload = $remainingIterableType->payload;
-                            if (is_string($payload)) {
-                                $compiledIterableType = $payload;
-                            }
-                        }
-
-                        if (! is_string($compiledIterableType)) {
-                            throw new RuntimeException('At this point $compiledIterableType should be a string');
-                        }
-
-                        $compiledTYpe                        = ($property->nullable ? '?' : '') . 'array<' . $compiledIterableType . '>';
-                        $contractProperties[$property->name] = '@property ' . $compiledTYpe . ' $' . $property->name;
-                    }
-                } elseif (is_array($property->type->payload)) {
-                    $schemaClasses = [];
-                    foreach ($property->type->payload as $payloadType) {
-                        $schemaClasses = [...$schemaClasses, ...UnionTypeUtils::getUnionTypeSchemas($payloadType)];
-                    }
-
-                    if (count($schemaClasses) > 0) {
-                        $compiledTYpe                        = ($property->nullable ? '?' : '') . 'array<' . implode('|', array_unique([
-                            ...(static function (Representation\Namespaced\Schema ...$schemas): iterable {
-                                foreach ($schemas as $schema) {
-                                    yield $schema->className->fullyQualified->source;
-                                }
-                            })(...$schemaClasses),
-                        ])) . '>';
-                        $contractProperties[$property->name] = '@property ' . $compiledTYpe . ' $' . $property->name;
-                    }
-                }
-
-                $types[] = 'array';
-            } elseif ($property->type->payload instanceof Representation\Namespaced\Schema) {
-                $types[] = $property->type->payload->className->fullyQualified->source;
-            } elseif (is_string($property->type->payload)) {
-                $types[] = $property->type->payload;
-            }
-
-            $types = array_unique($types);
-
-            $nullable = '';
-            if ($property->nullable) {
-                $nullable = count($types) > 1 || count(explode('|', implode('|', $types))) > 1 ? 'null|' : '?';
-            }
-
-            if (count($types) > 0) {
-                if (! array_key_exists($property->name, $contractProperties)) {
-                    $contractProperties[$property->name] = '@property ' . $nullable . implode('|', $types) . ' $' . $property->name;
-                }
-            } else {
-                if (! array_key_exists($property->name, $contractProperties)) {
-                    $contractProperties[$property->name] = '@property $' . $property->name;
-                }
-            }
+            $contractProperties[$property->name] = $resolved->docBlockLine;
         }
 
         if (count($contractProperties) > 0) {
-            $interface->setDocComment('/**' . PHP_EOL . ' * ' . implode(PHP_EOL . ' * ', $contractProperties) . PHP_EOL . ' */');
+            $interface->setDocComment(DocBlockBuilder::fromLines(array_values($contractProperties)));
         }
 
         yield new File($pathPrefix, $contract->className->relative, $this->builderFactory->namespace($contract->className->namespace->source)->addStmt($interface)->getNode(), File::DO_LOAD_ON_WRITE);

@@ -14,6 +14,7 @@
         "eventsauce/object-hydrator": "^1.5",
         "nikic/php-parser": "^5.0",
         "openapi-tools/contract": "dev-main",
+        "openapi-tools/generator-utils": "dev-main",
         "openapi-tools/representation": "dev-main",
         "openapi-tools/utils": "dev-main"
     },
