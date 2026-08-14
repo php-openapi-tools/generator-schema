@@ -4,4 +4,8 @@ declare(strict_types=1);
 
 use WyriHaximus\TestUtilities\RectorConfig;
 
-return RectorConfig::configure(dirname(__DIR__, 2));
+return RectorConfig::configure(dirname(__DIR__, 2))
+    ->withSkip([
+        dirname(__DIR__, 2) . '/tests/DataTests',
+        dirname(__DIR__, 2) . '/tests/SchemaTest.php',
+    ]);

@@ -7,15 +7,15 @@ namespace OpenAPITools\Generator\Schema\Internal\Schema;
 use Attribute;
 use EventSauce\ObjectHydrator\ObjectMapper;
 use EventSauce\ObjectHydrator\PropertyCaster;
+use OpenAPITools\Generator\Utils\Builder\ExpressionBuilder;
+use OpenAPITools\Generator\Utils\Builder\StatementBuilder;
 use OpenAPITools\Representation\Namespaced\Property;
 use OpenAPITools\Representation\Namespaced\Schema;
 use OpenAPITools\Utils\ClassString;
 use OpenAPITools\Utils\File;
 use PhpParser\BuilderFactory;
-use PhpParser\Node;
-use Throwable;
+use PhpParser\Node\Stmt;
 
-use function array_shift;
 use function count;
 use function implode;
 use function is_scalar;
@@ -43,56 +43,31 @@ final class SingleCastUnionToType
                 $builderFactory->param('value')->setType('mixed'),
                 $builderFactory->param('hydrator')->setType('\\' . ObjectMapper::class),
             ])->setReturnType('mixed')->addStmts([
-                new Node\Stmt\If_(
-                    $builderFactory->funcCall(
-                        '\is_array',
-                        [
-                            $builderFactory->var('value'),
-                        ],
-                    ),
+                new Stmt\If_(
+                    ExpressionBuilder::funcCall('is_array', ['value']),
                     [
                         'stmts' => [
-                            new Node\Stmt\Expression(
-                                new Node\Expr\Assign(
-                                    $builderFactory->var('signatureChunks'),
-                                    $builderFactory->funcCall(
-                                        '\array_unique',
-                                        [
-                                            $builderFactory->funcCall(
-                                                '\array_keys',
-                                                [
-                                                    $builderFactory->var('value'),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                ),
+                            StatementBuilder::assign(
+                                'signatureChunks',
+                                ExpressionBuilder::funcCall('array_unique', [
+                                    ExpressionBuilder::funcCall('array_keys', ['value']),
+                                ]),
                             ),
-                            new Node\Stmt\Expression(
-                                $builderFactory->funcCall(
-                                    '\sort',
-                                    [
-                                        $builderFactory->var('signatureChunks'),
-                                    ],
-                                ),
+                            new Stmt\Expression(
+                                ExpressionBuilder::funcCall('sort', ['signatureChunks']),
                             ),
-                            new Node\Stmt\Expression(
-                                new Node\Expr\Assign(
-                                    $builderFactory->var('signature'),
-                                    $builderFactory->funcCall(
-                                        '\implode',
-                                        [
-                                            '|',
-                                            $builderFactory->var('signatureChunks'),
-                                        ],
-                                    ),
-                                ),
+                            StatementBuilder::assign(
+                                'signature',
+                                ExpressionBuilder::funcCall('implode', [
+                                    ExpressionBuilder::literalString('|'),
+                                    'signatureChunks',
+                                ]),
                             ),
                             ...(static function (BuilderFactory $builderFactory, ClassString $classString, Schema ...$schemas): iterable {
                                 foreach ($schemas as $schema) {
-                                    $condition = new Node\Expr\BinaryOp\Identical(
-                                        $builderFactory->var('signature'),
-                                        new Node\Scalar\String_(
+                                    $condition = ExpressionBuilder::identical(
+                                        ExpressionBuilder::var('signature'),
+                                        ExpressionBuilder::literalString(
                                             implode(
                                                 '|',
                                                 [
@@ -117,11 +92,8 @@ final class SingleCastUnionToType
                                                 continue;
                                             }
 
-                                            $enumConditionals[] = new Node\Expr\BinaryOp\Identical(
-                                                new Node\Expr\ArrayDimFetch(
-                                                    $builderFactory->var('value'),
-                                                    new Node\Scalar\String_($property->sourceName),
-                                                ),
+                                            $enumConditionals[] = ExpressionBuilder::identical(
+                                                ExpressionBuilder::arrayFetch('value', $property->sourceName),
                                                 $builderFactory->val($enumPossibility),
                                             );
                                         }
@@ -130,43 +102,30 @@ final class SingleCastUnionToType
                                             continue;
                                         }
 
-                                        $enumCondition = array_shift($enumConditionals);
-                                        foreach ($enumConditionals as $enumConditional) {
-                                            $enumCondition = new Node\Expr\BinaryOp\BooleanOr(
-                                                $enumCondition,
-                                                $enumConditional,
-                                            );
-                                        }
-
-                                        $condition = new Node\Expr\BinaryOp\BooleanAnd(
+                                        $condition = ExpressionBuilder::andAll([
                                             $condition,
-                                            $enumCondition,
-                                        );
+                                            count($enumConditionals) === 1
+                                                ? $enumConditionals[0]
+                                                : ExpressionBuilder::orAll($enumConditionals),
+                                        ]);
                                     }
 
-                                    yield new Node\Stmt\If_(
+                                    yield new Stmt\If_(
                                         $condition,
                                         [
                                             'stmts' => [
-                                                new Node\Stmt\TryCatch([
-                                                    new Node\Stmt\Return_(
-                                                        $builderFactory->methodCall(
-                                                            $builderFactory->var('hydrator'),
+                                                StatementBuilder::tryReturnIgnoringThrowable(
+                                                    new Stmt\Return_(
+                                                        ExpressionBuilder::methodCall(
+                                                            ExpressionBuilder::var('hydrator'),
                                                             'hydrateObject',
                                                             [
-                                                                $builderFactory->classConstFetch(
-                                                                    $classString->fullyQualified->source,
-                                                                    'class',
-                                                                ),
-                                                                $builderFactory->var('value'),
+                                                                ExpressionBuilder::classConstant($classString->fullyQualified->source),
+                                                                'value',
                                                             ],
                                                         ),
                                                     ),
-                                                ], [
-                                                    new Node\Stmt\Catch_(
-                                                        [new Node\Name('\\' . Throwable::class)],
-                                                    ),
-                                                ]),
+                                                ),
                                             ],
                                         ],
                                     );
@@ -175,9 +134,7 @@ final class SingleCastUnionToType
                         ],
                     ],
                 ),
-                new Node\Stmt\Return_(
-                    $builderFactory->var('value'),
-                ),
+                new Stmt\Return_(ExpressionBuilder::var('value')),
             ]),
         );
 
