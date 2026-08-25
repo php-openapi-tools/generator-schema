@@ -13,14 +13,14 @@
         "ext-json": "^8.4",
         "eventsauce/object-hydrator": "^1.5",
         "nikic/php-parser": "^5.0",
-        "openapi-tools/contract": "dev-main",
-        "openapi-tools/generator-utils": "dev-main",
-        "openapi-tools/representation": "dev-main",
-        "openapi-tools/utils": "dev-main"
+        "openapi-tools/contract": "^0.1.0",
+        "openapi-tools/generator-utils": "^0.1.0",
+        "openapi-tools/representation": "^0.1.0",
+        "openapi-tools/utils": "^0.1.0"
     },
     "require-dev": {
-        "openapi-tools/configuration": "dev-main",
-        "openapi-tools/gatherer": "dev-main",
+        "openapi-tools/configuration": "^0.1.0",
+        "openapi-tools/gatherer": "^0.1.0",
         "openapi-tools/test-data": "dev-main",
         "wyrihaximus/async-test-utilities": "^13.5.1",
         "wyrihaximus/makefiles": "^0.13.3"
