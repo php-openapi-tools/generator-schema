@@ -19,9 +19,10 @@
         "openapi-tools/utils": "^0.1.0"
     },
     "require-dev": {
+        "dantleech/docbot": "^0.3.0",
         "openapi-tools/configuration": "^0.1.0",
         "openapi-tools/gatherer": "^0.1.0",
-        "openapi-tools/test-data": "dev-main",
+        "openapi-tools/test-data": "^0.1.0",
         "wyrihaximus/async-test-utilities": "^13.5.1",
         "wyrihaximus/makefiles": "^0.13.3"
     },
