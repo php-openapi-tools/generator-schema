@@ -1,0 +1,213 @@
+<?php
+
+declare(strict_types=1);
+
+use cebe\openapi\Reader;
+use DTL\Docbot\Article\Article;
+use DTL\Docbot\Extension\Core\Block\CreateFileBlock;
+use DTL\Docbot\Extension\Core\Block\SectionBlock;
+use DTL\Docbot\Extension\Core\Block\TextBlock;
+use OpenAPITools\Configuration\Gathering;
+use OpenAPITools\Configuration\Package;
+use OpenAPITools\Gatherer\Gatherer;
+use OpenAPITools\Generator\Schema\Schema;
+use OpenAPITools\Utils\Namespace_;
+use PhpParser\BuilderFactory;
+use PhpParser\Node;
+use PhpParser\PrettyPrinter\Standard;
+
+require dirname(__DIR__, 2) . '/vendor/autoload.php';
+
+$exampleInput = file_get_contents(__DIR__ . '/example-input.yaml');
+if (!is_string($exampleInput)) {
+    throw new RuntimeException('Could not read example-input.yaml');
+}
+
+$exampleInputPath = realpath(__DIR__ . '/example-input.yaml');
+if ($exampleInputPath === false) {
+    throw new RuntimeException('Could not resolve example-input.yaml');
+}
+
+$representation = Gatherer::gather(
+    Reader::readFromYamlFile($exampleInputPath),
+    new Gathering(
+        $exampleInputPath,
+        null,
+        new Gathering\Schemas(
+            allowDuplication: true,
+            useAliasesForDuplication: true,
+        ),
+    ),
+);
+
+$package = new Package(
+    new Package\Metadata('Example', 'Example API client', []),
+    'api-clients',
+    'example',
+    'git@example.com:example.git',
+    'v1',
+    null,
+    new Package\Templates(__DIR__ . '/templates', []),
+    new Package\Destination('example', 'src', 'tests'),
+    new Namespace_('ApiClients\Client\Example', 'ApiClients\Tests\Client\Example'),
+    new Package\QA(
+        phpcs: new Package\QA\Tool(false, null),
+        phpstan: new Package\QA\Tool(false, null),
+        psalm: new Package\QA\Tool(false, null),
+    ),
+    new Package\State([]),
+    [],
+);
+
+$namespaced = $representation->namespace($package->namespace);
+$printer    = new Standard();
+$highlight  = ['Contract\\Basic', 'Error\\Basic', 'Schema\\Basic'];
+
+/** @var list<SectionBlock> $generatedFileSections */
+$generatedFileSections = [];
+
+foreach (new Schema(new BuilderFactory())->generate($package, $namespaced) as $generatedFile) {
+    if (!in_array($generatedFile->fqcn, $highlight, true)) {
+        continue;
+    }
+
+    $contents = $generatedFile->contents;
+    if (!$contents instanceof Node) {
+        continue;
+    }
+
+    $source = '<?php '. $printer->prettyPrint([
+        new Node\Stmt\Declare_([
+            new Node\Stmt\DeclareDeclare('strict_types', new Node\Scalar\LNumber(1)),
+        ]),
+        $contents,
+    ]);
+
+    $relativePath = $generatedFile->pathPrefix . '/' . str_replace('\\', '/', $generatedFile->fqcn) . '.php';
+
+    $generatedFileSections[] = new SectionBlock($relativePath, [
+        <<<PHP
+        ```php
+        {$source}
+        ```
+        PHP,
+    ]);
+}
+
+return Article::create('../../README', 'generator-schema', [
+    <<<'TEXT'
+    [`FileGenerator`](https://github.com/php-openapi-tools/contract) for [OpenAPI Tools](https://github.com/php-openapi-tools) that turns gathered schema metadata into PHP source files: readonly value objects, contract interfaces, and throwable error wrappers.
+
+    ![Continuous Integration](https://github.com/php-openapi-tools/generator-schema/workflows/Continuous%20Integration/badge.svg)
+    [![Latest Stable Version](https://poser.pugx.org/openapi-tools/generator-schema/v/stable.png)](https://packagist.org/packages/openapi-tools/generator-schema)
+    [![Total Downloads](https://poser.pugx.org/openapi-tools/generator-schema/downloads.png)](https://packagist.org/packages/openapi-tools/generator-schema/stats)
+    [![License](https://poser.pugx.org/openapi-tools/generator-schema/license.png)](https://packagist.org/packages/openapi-tools/generator-schema)
+    TEXT,
+    new SectionBlock('Requirements', [
+        <<<'TEXT'
+        - PHP `^8.4`
+        - `ext-json`
+        TEXT,
+    ]),
+    new SectionBlock('Installation', [
+        <<<'TEXT'
+        ```
+        composer require openapi-tools/generator-schema
+        ```
+        TEXT,
+    ]),
+    new SectionBlock('Where it fits', [
+        <<<'TEXT'
+        This package runs after [`gatherer`](https://github.com/php-openapi-tools/gatherer) has built a [`representation`](https://github.com/php-openapi-tools/representation) and class names have been resolved with `Representation::namespace()`. Register `Schema` **before** [`generator-hydrator`](https://github.com/php-openapi-tools/generator-hydrator).
+
+        ```mermaid
+        flowchart LR
+          spec[OpenAPI spec] --> gatherer[Gatherer]
+          gatherer --> rep[Representation]
+          rep --> ns["namespace()"]
+          ns --> gen[Schema generator]
+          gen --> contract[Contract interfaces]
+          gen --> error[Error classes]
+          gen --> schema[Schema classes]
+        ```
+        TEXT,
+    ]),
+    new SectionBlock('Example', [
+        <<<'TEXT'
+        The snippet below is generated by running the schema generator against a real OpenAPI input when you run `make generate-readme`. The example driver lives in [`etc/docs/README.php`](etc/docs/README.php).
+
+        TEXT,
+        new TextBlock(
+            '**Input** — OpenAPI component schema (`%path%`):',
+            context: new CreateFileBlock('example-input.yaml', 'yaml', $exampleInput),
+        ),
+        new SectionBlock('Output', [
+            'Running gatherer + `Schema::generate()` against the input above emits these files for the `basic` schema:',
+            ...$generatedFileSections,
+        ]),
+        <<<'TEXT'
+        For each schema, the generator emits three kinds of files in a fixed order:
+
+        1. **Contract** — interface with `@property` PHPDoc
+        2. **Error** — final `\Error` subclass carrying status code + hydrated schema
+        3. **Schema** — final `readonly` class with promoted constructor properties and `SCHEMA_*` constants
+
+        In a full client package, `Schema` is wired into the generator run loop alongside other `FileGenerator` implementations. A minimal direct invocation looks like this:
+
+        ```php
+        use OpenAPITools\Generator\Schema\Schema;
+        use PhpParser\BuilderFactory;
+
+        $generator = new Schema(new BuilderFactory());
+
+        foreach ($generator->generate($package, $representation->namespace($package->namespace)) as $file) {
+            // $file->pathPrefix  — e.g. "src"
+            // $file->fqcn        — e.g. "Schema\\Basic"
+            // $file->contents    — PhpParser Node
+        }
+        ```
+
+        See [`openapi-tools/generator`](https://github.com/php-openapi-tools/generator#configuration) for a complete package configuration.
+        TEXT,
+    ]),
+    new SectionBlock('Related packages', [
+        <<<'TEXT'
+        | Package | Relationship |
+        | --- | --- |
+        | [`contract`](https://github.com/php-openapi-tools/contract) | `FileGenerator` and `Package` interfaces |
+        | [`representation`](https://github.com/php-openapi-tools/representation) | Input model consumed by this generator |
+        | [`gatherer`](https://github.com/php-openapi-tools/gatherer) | Builds the representation from OpenAPI |
+        | [`generator-utils`](https://github.com/php-openapi-tools/generator-utils) | AST builders and type resolution helpers |
+        | [`generator-hydrator`](https://github.com/php-openapi-tools/generator-hydrator) | Typically runs after this package |
+        | [`generator`](https://github.com/php-openapi-tools/generator) | CLI and run loop that orchestrates all generators |
+        TEXT,
+    ]),
+    new SectionBlock('Contributing', [
+        'Please see [CONTRIBUTING](CONTRIBUTING.md) for details.',
+    ]),
+    new SectionBlock('License', [
+        <<<'TEXT'
+        The MIT License (MIT)
+
+        Copyright (c) 2026 Cees-Jan Kiewiet
+
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+        TEXT,
+    ]),
+]);
